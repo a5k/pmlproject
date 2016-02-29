@@ -1,0 +1,109 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Anubhav Swami"
+date: "February 28, 2016"
+output: html_document
+---
+
+## Summary
+
+This paper summarizes methods used to generate a model to predict how well exercises are performed based on motion data collected during the exercise. The data used for this paper were obtained from the Weight Lifting Exercises dataset. Details on the study to collect these data can be found [here](http://groupware.les.inf.puc-rio.br/har#ixzz41WEgNlRG "Title")
+
+
+We have used a random forest based predictive model to classify how well an exercise was performed based on 53 predictors. These predictors were various motion based measurements collected by sensors attached to partipants' arms, forearms, waist, and on the exercise equipment (dumbells). 
+
+## Reading and cleaning data
+
+Data were provided as two datasets - a training set comprising 19622 observations and 160 columns, and a test set comprising 20 observations and 160 columns - as comma separated values. Exploration of the trainng dataset revealed that many columns did not have relevant data (#DIV/0, blank, or NA values). Additionally the first 7 columns in the dataset were simply metadata about the study and not useful for prediction. So the data were preprocessed to remove all columns that did not serve a perdictive purpose. Both the training and testing dataset were processed in the same manner to ensure that model testing could be performed. On comparing the training and testing dataset post-processing, we find that all columns in both sets are the same with the exception of the last column - the outcome variable, classe. The training dataset has the classe variable while the testing dataset does not. 
+
+```{r echo = TRUE}
+##load libraries
+library(caret, quietly = TRUE)
+library(randomForest, quietly = TRUE)
+
+##read in datasets
+training <- read.csv("pml_training.csv", header = TRUE, 
+                     colClasses = NA, na.strings = c("NA", "#DIV/0", ""))
+
+testing <-  read.csv("pml_testing.csv", header = TRUE, 
+                     colClasses = NA, na.strings = c("NA", "#DIV/0", ""))
+
+## eliminate unncessary varaiables from training and testing set
+## columns to remove are columns that contain study metadata and
+## columns that don't contain values in every observation in the training data
+
+## remove all columns that contain an NA value since we cannot use this for prediction
+training <- training[,which(colSums(is.na(training)) == 0)]
+testing <- testing[,which(colSums(is.na(testing)) == 0)]
+
+## the first 7 metadata olumns upon observation are not useful for prediction 
+training <- training[,8:ncol(training)]
+testing <- testing[,8:ncol(testing)]
+
+## test to see if we have the same columns in both datasets
+compareCols <- names(training) == names(testing)
+print(compareCols)
+```
+
+
+## Creating training and testing subsets
+
+With the data now preprocessed, we break up the training dataset into a training and testing subset to measure the out of sample error generated when using a random forest model. 
+
+We are constraining this paper to using a random forest model for prediction. A comparative evaluation of the predictive performance of different models for this prediction problem is desirable but hasn't been conducted for this paper. 
+
+``` {r echo = TRUE}
+## now that an appropriate set of predictors has been chosen split
+## the training set into a train and test set so that out of sample 
+## error can be computed
+
+inTrain <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+trainsubset <- training[inTrain,]
+testsubset<- training[-inTrain,]
+
+```
+
+We end up with a training subset of 13737 observations and 53 variables, and a test subset of 5885 observations and 53 variables. We will use these datasets to train and test a random forest model and compute out of sample error. We will then apply the trained model to actual test dataset to get predicted classes for the 20 cases provided in the test dataset. 
+
+## Fitting a random forest model
+
+We first fit a random forest model with no cross validation to the training subset. We test the model against the testing subset within the training data and generate a confusion matrix to evaluate the out-of-sample acccuracy. 
+
+```{r echo  = TRUE, cache = TRUE}
+## due to the computational cost in training the model 
+## we have saved the model as a data file so we can re-use it for rmd renders
+#
+
+if (file.exists("model1.rda")){load("model1.rda")
+} else{
+    model1 <- train(classe ~ ., data = trainsubset, method = "rf")
+    save(model1, file = "./pml/model1.rda")}
+
+##model1$finalModel
+
+predictedclass <- predict(model1, newdata = testsubset)
+confusionMatrix(testsubset$classe, predictedclass)
+
+```
+
+We see that the accuracy of the model in predicting the class in the test set is 0.9973 (or 99.73%), which yields an out-of-sample error of 0.27% without any cross validation applied. 
+
+Applying the trained model to the actual test data yields the following predictions
+
+```{r echo = TRUE}
+predictedclass1 <- predict(model1, newdata = testing)
+predictedclass1
+
+```
+
+
+## Further Analysis
+
+Given the accuracy obtained with using a random forest without any cross validation, and the fact the trained model predicted all 20 test cases correctly, we aren't going to fit any other models to our training data. We could have tried k-fold (k = 3 or 4) cross validation to increase accuracy as well as retrained the model on the entire training dataset before predicting the final test dataset (also with the intent to increase accuracy) but we are not going to do that in this paper due to time limitations. 
+
+
+## References
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. 
+
+
