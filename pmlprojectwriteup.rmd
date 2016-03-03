@@ -92,7 +92,9 @@ Applying the trained model to the actual test data yields the following predicti
 
 ```{r echo = TRUE}
 predictedclass1 <- predict(model1, newdata = testing)
-predictedclass1
+## we are going to hide the prediction result since this document is freely 
+## available 
+##predictedclass1
 
 ```
 
